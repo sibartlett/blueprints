@@ -1,0 +1,71 @@
+blueprint:
+  name: Occupancy-activated Light
+  description: |-
+    Turn on a light when occupancy is detected, and off when occupacy is cleared.
+    Unless the light is already on, in which case we do nothing.
+
+    A duration/timeout is not configurable, as it is assumed that
+    the occupancy sensor itself has been set to the desired duration.
+  domain: automation
+  source_url: https://github.com/sibartlett/blueprints/blob/main/occupancy_light.yaml
+  input:
+    occupancy_entity:
+      name: Occupancy Sensor
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class: occupancy
+    light_entity:
+      name: Light
+      selector:
+        entity:
+          domain: light
+    illuminance_entity:
+      name: Illuminance Sensor
+      selector:
+        entity:
+          domain: sensor
+          device_class: illuminance
+    max_illuminance:
+      name: Maximum ambient light value
+      description: Light is not activated above this value.
+      default: 100
+      selector:
+        number:
+          min: 0.0
+          max: 1000.0
+          step: 10.0
+          unit_of_measurement: lx
+          mode: slider
+
+mode: single
+max_exceeded: silent
+
+trigger:
+  - platform: state
+    entity_id: !input occupancy_entity
+    from: "off"
+    to: "on"
+
+condition:
+  - condition: state
+    entity_id: !input light_entity
+    state: "off"
+  - condition: numeric_state
+    entity_id: !input illuminance_entity
+    below: !input max_illuminance
+
+action:
+  - alias: "Turn on the light"
+    service: light.turn_on
+    target:
+      entity_id: !input light_entity
+  - alias: "Wait until there is no occupancy from device"
+    wait_for_trigger:
+      - platform: state
+        entity_id: !input occupancy_entity
+        to: "off"
+  - alias: "Turn off the light"
+    service: light.turn_off
+    target:
+      entity_id: !input light_entity
