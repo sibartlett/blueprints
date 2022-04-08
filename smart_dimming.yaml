@@ -1,0 +1,114 @@
+# Based on the following blueprint:
+# https://community.home-assistant.io/t/smart-light-dimmer-dim-light-depending-on-light-sensor-value/403646
+# https://gist.github.com/Twanne/45868f53efb65bbd998d8aed2dca0f76
+blueprint:
+  name: Smart Dimming
+  description: |-
+    Dim or turn off a collection of lights based on the value of a light sensor.
+
+    If a light has been manually controlled,
+    the automation will not attempt to turn it off or override its brightness.
+
+    However, this behaviour is not perfect:
+    if at some point the automation reaches the same brightness as a manually controlled light,
+    the automation will assume control of the light.
+  source_url: https://github.com/sibartlett/blueprints/blob/main/smart_dimming.yaml
+  domain: automation
+  input:
+    light_sensor_entity:
+      name: Light Sensor
+      selector:
+        entity:
+          domain: sensor
+          device_class: illuminance
+    max_brightness_value:
+      name: Maximum ambient light value
+      description: Light is turned off above this value.
+      default: 550
+      selector:
+        number:
+          min: 0.0
+          max: 1000.0
+          step: 10.0
+          unit_of_measurement: lx
+          mode: slider
+    min_brightness_value:
+      name: Minimum ambient light value
+      description: The light does not change brightness further under this value.
+      default: 0
+      selector:
+        number:
+          min: 0.0
+          max: 1000.0
+          step: 10.0
+          unit_of_measurement: lx
+          mode: slider
+    light_value_1:
+      name: Dimming value 1
+      description: Brightness of the light at maximum ambient light.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+          mode: slider
+    light_value_2:
+      name: Dimming value 2
+      description: Brightness of the light at minimum ambient light.
+      default: 25
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+          mode: slider
+    light_entities:
+      name: Lights
+      selector:
+        entity:
+          domain: light
+          multiple: true
+
+mode: single
+
+variables:
+  maxB: !input max_brightness_value
+  minB: !input min_brightness_value
+  light1: !input light_value_1
+  light2: !input light_value_2
+  light_entities: !input light_entities
+  old_state: "{{ trigger.to_state.state if trigger.from_state.state == 'unknown' else trigger.from_state.state }}"
+  current_lux: "{{ max(min(trigger.to_state.state | float, maxB), minB) | round | int }}"
+  previous_lux: "{{ max(min(old_state | float, maxB), minB) | round | int }}"
+  slope: "{{ ( light1 - light2 ) / ( maxB - minB ) }}"
+  constant: "{{ light1 - ( slope * maxB ) }}"
+  next_brightness: "{{ (( slope * current_lux ) + constant) | round | int }}"
+  previous_brightness: "{{ (( slope * previous_lux ) + constant) | round | int }}"
+
+trigger:
+  - platform: state
+    entity_id: !input light_sensor_entity
+
+condition:
+  - condition: template
+    value_template: "{{ current_lux != previous_lux }}"
+
+action:
+  - alias: Loop through each light
+    repeat:
+      count: "{{ light_entities|count }}"
+      sequence:
+        - variables:
+            light_entity: "{{ light_entities[repeat.index - 1] }}"
+            light_state: '{{0 if states(light_entity) == "off" else state_attr(light_entity, "brightness") / 255 * 100 }}'
+            current_brightness: "{{light_state | round | int }}"
+        - alias: Check if the light's brightness matches the previous automation run
+          condition: template
+          value_template: "{{ current_brightness == previous_brightness }}"
+        - alias: Update the light's brightness
+          service: light.turn_on
+          data:
+            brightness_pct: "{{ next_brightness }}"
+          target:
+            entity_id: "{{ light_entity }}"
