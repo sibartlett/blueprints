@@ -14,6 +14,8 @@ blueprint:
     the automation will assume control of the light.
   source_url: https://github.com/sibartlett/blueprints/blob/main/smart_dimming.yaml
   domain: automation
+  homeassistant:
+    min_version: 2022.4.0
   input:
     light_sensor_entity:
       name: Light Sensor
