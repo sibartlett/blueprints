@@ -81,12 +81,12 @@ variables:
   light2: !input light_value_2
   light_entities: !input light_entities
   old_state: "{{ trigger.to_state.state if trigger.from_state.state == 'unknown' else trigger.from_state.state }}"
-  current_lux: "{{ max(min(trigger.to_state.state | float, maxB), minB) | round | int }}"
-  previous_lux: "{{ max(min(old_state | float, maxB), minB) | round | int }}"
+  current_lux: "{{ max(min(trigger.to_state.state | float, maxB + 1), minB) | round | int }}"
+  previous_lux: "{{ max(min(old_state | float, maxB + 1), minB) | round | int }}"
   slope: "{{ ( light1 - light2 ) / ( maxB - minB ) }}"
   constant: "{{ light1 - ( slope * maxB ) }}"
-  next_brightness: "{{ (( slope * current_lux ) + constant) | round | int }}"
-  previous_brightness: "{{ (( slope * previous_lux ) + constant) | round | int }}"
+  next_brightness: "{{ 0 if current_lux > maxB else (( slope * current_lux ) + constant) | round | int }}"
+  previous_brightness: "{{ 0 if previous_lux > maxB else (( slope * previous_lux ) + constant) | round | int }}"
 
 trigger:
   - platform: state
@@ -94,7 +94,7 @@ trigger:
 
 condition:
   - condition: template
-    value_template: "{{ current_lux != previous_lux }}"
+    value_template: "{{ next_brightness != previous_brightness }}"
 
 action:
   - alias: Loop through each light
