@@ -12,6 +12,8 @@ blueprint:
     However, this behaviour is not perfect:
     if at some point the automation reaches the same brightness as a manually controlled light,
     the automation will assume control of the light.
+
+    ![](https://sibartlett.github.io/blueprints/smart_dimming.png)
   source_url: https://github.com/sibartlett/blueprints/blob/main/smart_dimming.yaml
   domain: automation
   homeassistant:
@@ -23,19 +25,8 @@ blueprint:
         entity:
           domain: sensor
           device_class: illuminance
-    max_brightness_value:
-      name: Maximum ambient light value
-      description: Light is turned on below this value.
-      default: 550
-      selector:
-        number:
-          min: 0.0
-          max: 1000.0
-          step: 10.0
-          unit_of_measurement: lx
-          mode: slider
     min_brightness_value:
-      name: Minimum ambient light value
+      name: (A) Minimum ambient light value
       description: The light does not change brightness further under this value.
       default: 5
       selector:
@@ -45,10 +36,20 @@ blueprint:
           step: 10.0
           unit_of_measurement: lx
           mode: slider
-    margin_brightness_value:
-      name: Margin ambient light value
-      description: Light is turned off above this margin.
-      default: 300
+    light_value_2:
+      name: (A) Dimming value 2
+      description: Brightness of the light at minimum ambient light.
+      default: 25
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+          mode: slider
+    max_brightness_value:
+      name: (B) Maximum ambient light value
+      description: Light is turned on below this value.
+      default: 550
       selector:
         number:
           min: 0.0
@@ -57,7 +58,7 @@ blueprint:
           unit_of_measurement: lx
           mode: slider
     light_value_1:
-      name: Dimming value 1
+      name: (B) Dimming value 1
       description: Brightness of the light at maximum ambient light.
       default: 1
       selector:
@@ -66,15 +67,16 @@ blueprint:
           max: 100
           step: 1
           mode: slider
-    light_value_2:
-      name: Dimming value 2
-      description: Brightness of the light at minimum ambient light.
-      default: 25
+    margin_brightness_value:
+      name: (C) Ambient light margin
+      description: Light is turned off above this margin.
+      default: 300
       selector:
         number:
-          min: 0
-          max: 100
-          step: 1
+          min: 0.0
+          max: 1000.0
+          step: 10.0
+          unit_of_measurement: lx
           mode: slider
     light_entities:
       name: Lights
