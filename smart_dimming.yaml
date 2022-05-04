@@ -25,7 +25,7 @@ blueprint:
           device_class: illuminance
     max_brightness_value:
       name: Maximum ambient light value
-      description: Light is turned off above this value.
+      description: Light is turned on below this value.
       default: 550
       selector:
         number:
@@ -37,7 +37,18 @@ blueprint:
     min_brightness_value:
       name: Minimum ambient light value
       description: The light does not change brightness further under this value.
-      default: 0
+      default: 5
+      selector:
+        number:
+          min: 0.0
+          max: 1000.0
+          step: 10.0
+          unit_of_measurement: lx
+          mode: slider
+    margin_brightness_value:
+      name: Margin ambient light value
+      description: Light is turned off above this margin.
+      default: 300
       selector:
         number:
           min: 0.0
@@ -48,7 +59,7 @@ blueprint:
     light_value_1:
       name: Dimming value 1
       description: Brightness of the light at maximum ambient light.
-      default: 0
+      default: 1
       selector:
         number:
           min: 0
@@ -77,16 +88,15 @@ mode: single
 variables:
   maxB: !input max_brightness_value
   minB: !input min_brightness_value
+  marginB: !input margin_brightness_value
   light1: !input light_value_1
   light2: !input light_value_2
   light_entities: !input light_entities
   old_state: "{{ trigger.to_state.state if trigger.from_state.state == 'unknown' else trigger.from_state.state }}"
-  current_lux: "{{ max(min(trigger.to_state.state | float, maxB + 1), minB) | round | int }}"
-  previous_lux: "{{ max(min(old_state | float, maxB + 1), minB) | round | int }}"
+  current_lux: "{{ max(trigger.to_state.state | float, minB) | round | int }}"
+  previous_lux: "{{ max(old_state | float, minB) | round | int }}"
   slope: "{{ ( light1 - light2 ) / ( maxB - minB ) }}"
   constant: "{{ light1 - ( slope * maxB ) }}"
-  next_brightness: "{{ 0 if current_lux > maxB else (( slope * current_lux ) + constant) | round | int }}"
-  previous_brightness: "{{ 0 if previous_lux > maxB else (( slope * previous_lux ) + constant) | round | int }}"
 
 trigger:
   - platform: state
@@ -94,7 +104,7 @@ trigger:
 
 condition:
   - condition: template
-    value_template: "{{ next_brightness != previous_brightness }}"
+    value_template: "{{ current_lux <= (maxB + marginB) or previous_lux <= (maxB + marginB) }}"
 
 action:
   - alias: Loop through each light
@@ -104,6 +114,8 @@ action:
         - variables:
             light_entity: "{{ light_entities[repeat.index - 1] }}"
             light_state: '{{0 if states(light_entity) == "off" else state_attr(light_entity, "brightness") / 255 * 100 }}'
+            next_brightness: "{{ 0 if current_lux > (maxB + marginB) or current_lux > maxB and light_state == 0 else (( slope * max(min(current_lux, maxB), minB) ) + constant) | round | int }}"
+            previous_brightness: "{{ 0 if previous_lux > (maxB + marginB) or previous_lux > maxB and light_state == 0  else (( slope * max(min(previous_lux, maxB), minB) ) + constant) | round | int }}"
             current_brightness: "{{light_state | round | int }}"
         - alias: Check if the light's brightness matches the previous automation run
           condition: template
