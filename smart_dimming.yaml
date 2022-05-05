@@ -17,7 +17,7 @@ blueprint:
   source_url: https://github.com/sibartlett/blueprints/blob/main/smart_dimming.yaml
   domain: automation
   homeassistant:
-    min_version: 2022.4.0
+    min_version: 2022.5.0
   input:
     light_sensor_entity:
       name: Light Sensor
@@ -111,11 +111,10 @@ condition:
 action:
   - alias: Loop through each light
     repeat:
-      count: "{{ light_entities|count }}"
+      for_each: "{{ light_entities }}"
       sequence:
         - variables:
-            light_entity: "{{ light_entities[repeat.index - 1] }}"
-            light_state: '{{0 if states(light_entity) == "off" else state_attr(light_entity, "brightness") / 255 * 100 }}'
+            light_state: '{{0 if states(repeat.item) == "off" else state_attr(repeat.item, "brightness") / 255 * 100 }}'
             next_brightness: "{{ 0 if current_lux > (maxB + marginB) or current_lux > maxB and light_state == 0 else (( slope * max(min(current_lux, maxB), minB) ) + constant) | round | int }}"
             previous_brightness: "{{ 0 if previous_lux > (maxB + marginB) or previous_lux > maxB and light_state == 0  else (( slope * max(min(previous_lux, maxB), minB) ) + constant) | round | int }}"
             current_brightness: "{{light_state | round | int }}"
@@ -127,4 +126,4 @@ action:
           data:
             brightness_pct: "{{ next_brightness }}"
           target:
-            entity_id: "{{ light_entity }}"
+            entity_id: "{{ repeat.item }}"
